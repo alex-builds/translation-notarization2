@@ -33,26 +33,32 @@ app.use('/api/notary', notaryRoutes);
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
-// GET /api/queue/stats
+// GET /api/queue/stats — public
 app.get('/api/queue/stats', async (req, res) => {
   try {
-    const [waiting, active, completed] = await Promise.all([
+    const [waiting, active, completedCount, recentJobs] = await Promise.all([
       translationQueue.getWaitingCount(),
       translationQueue.getActiveCount(),
-      translationQueue.getCompleted(0, 20),
+      translationQueue.getCompletedCount(),
+      translationQueue.getJobs(['completed'], 0, 9),
     ]);
 
     let avgProcessingMs = null;
-    if (completed.length > 0) {
-      const times = completed
-        .filter((j) => j.finishedOn && j.processedOn)
-        .map((j) => j.finishedOn - j.processedOn);
-      if (times.length > 0) {
-        avgProcessingMs = Math.round(times.reduce((a, b) => a + b, 0) / times.length);
-      }
+    const times = recentJobs
+      .filter((j) => j.finishedOn && j.processedOn)
+      .map((j) => j.finishedOn - j.processedOn);
+    if (times.length > 0) {
+      avgProcessingMs = Math.round(times.reduce((a, b) => a + b, 0) / times.length);
     }
 
-    res.json({ waiting, active, avgProcessingMs });
+    res.json({
+      queue: 'translation-queue',
+      waiting,
+      active,
+      inQueue: waiting + active,
+      completedCount,
+      avgProcessingMs,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

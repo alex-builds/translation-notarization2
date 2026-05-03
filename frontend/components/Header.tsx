@@ -31,11 +31,32 @@ function MoonIcon() {
   )
 }
 
+function HamburgerIcon({ open }: { open: boolean }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      {open ? (
+        <>
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </>
+      ) : (
+        <>
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </>
+      )}
+    </svg>
+  )
+}
+
 export default function Header() {
   const router = useRouter()
   const [authed, setAuthed] = useState(false)
   const [role, setRole] = useState<string | null>(null)
   const [dark, setDark] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
 
   useEffect(() => {
     setAuthed(isAuthenticated())
@@ -55,8 +76,39 @@ export default function Header() {
 
   function handleLogout() {
     removeToken()
+    setMobileOpen(false)
     router.push('/')
   }
+
+  const navLinks = authed ? (
+    role === 'notary' ? (
+      <Link href="/notary" onClick={() => setMobileOpen(false)} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors">
+        Notary Cabinet
+      </Link>
+    ) : (
+      <>
+        <Link href="/dashboard" onClick={() => setMobileOpen(false)} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors">
+          Dashboard
+        </Link>
+        <Link href="/upload" onClick={() => setMobileOpen(false)} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors">
+          Upload
+        </Link>
+      </>
+    )
+  ) : (
+    <>
+      <Link href="/login" onClick={() => setMobileOpen(false)} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors">
+        Login
+      </Link>
+      <Link
+        href="/register"
+        onClick={() => setMobileOpen(false)}
+        className="bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors"
+      >
+        Register
+      </Link>
+    </>
+  )
 
   return (
     <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10 transition-colors">
@@ -64,43 +116,18 @@ export default function Header() {
         <Link href="/" className="font-bold text-lg text-blue-600 dark:text-blue-400 tracking-tight">
           DocTranslate
         </Link>
-        <nav className="flex items-center gap-4 text-sm">
-          {authed ? (
-            <>
-              {role === 'notary' ? (
-                <Link href="/notary" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors">
-                  Notary Cabinet
-                </Link>
-              ) : (
-                <>
-                  <Link href="/dashboard" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors">
-                    Dashboard
-                  </Link>
-                  <Link href="/upload" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors">
-                    Upload
-                  </Link>
-                </>
-              )}
-              <button
-                onClick={handleLogout}
-                data-testid="logout-button"
-                className="text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-medium transition-colors"
-              >
-                Logout
-              </button>
-            </>
-          ) : (
-            <>
-              <Link href="/login" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors">
-                Login
-              </Link>
-              <Link
-                href="/register"
-                className="bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Register
-              </Link>
-            </>
+
+        {/* Desktop nav */}
+        <nav className="hidden md:flex items-center gap-4 text-sm">
+          {navLinks}
+          {authed && (
+            <button
+              onClick={handleLogout}
+              data-testid="logout-button"
+              className="text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-medium transition-colors"
+            >
+              Logout
+            </button>
           )}
           <button
             onClick={toggleDark}
@@ -110,7 +137,41 @@ export default function Header() {
             {dark ? <SunIcon /> : <MoonIcon />}
           </button>
         </nav>
+
+        {/* Mobile controls */}
+        <div className="flex md:hidden items-center gap-2">
+          <button
+            onClick={toggleDark}
+            aria-label="Toggle dark mode"
+            className="p-1.5 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          >
+            {dark ? <SunIcon /> : <MoonIcon />}
+          </button>
+          <button
+            onClick={() => setMobileOpen((o) => !o)}
+            aria-label="Toggle menu"
+            className="p-1.5 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          >
+            <HamburgerIcon open={mobileOpen} />
+          </button>
+        </div>
       </div>
+
+      {/* Mobile dropdown */}
+      {mobileOpen && (
+        <div className="md:hidden bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 px-4 py-3 flex flex-col gap-3 text-sm">
+          {navLinks}
+          {authed && (
+            <button
+              onClick={handleLogout}
+              data-testid="logout-button-mobile"
+              className="text-left text-red-500 dark:text-red-400 hover:text-red-700 font-medium transition-colors"
+            >
+              Logout
+            </button>
+          )}
+        </div>
+      )}
     </header>
   )
 }

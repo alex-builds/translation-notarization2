@@ -5,12 +5,13 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Header from '@/components/Header'
 import StatusBadge, { DocumentStatus } from '@/components/StatusBadge'
-import { isAuthenticated } from '@/lib/auth'
-import api from '@/lib/api'
+import { isAuthenticated, getToken } from '@/lib/auth'
+import api, { API_BASE_URL } from '@/lib/api'
 
 interface DocDetail {
   _id: string
   originalFile: string
+  originalFileName: string | null
   translatedFile: string | null
   fromLang: string
   toLang: string
@@ -23,16 +24,33 @@ interface DocContent {
   translated: string | null
 }
 
+async function downloadWithAuth(url: string, filename: string) {
+  const token = getToken()
+  const res = await fetch(url, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (!res.ok) throw new Error(`Download failed: ${res.status}`)
+  const blob = await res.blob()
+  const objectUrl = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = objectUrl
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(objectUrl)
+}
+
 function DownloadButton({
-  href,
+  onClick,
   label,
   icon,
   disabled,
+  loading,
 }: {
-  href: string
+  onClick?: () => void
   label: string
   icon: string
   disabled?: boolean
+  loading?: boolean
 }) {
   if (disabled) {
     return (
@@ -45,12 +63,16 @@ function DownloadButton({
     )
   }
   return (
-    <a
-      href={href}
-      className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 active:scale-[0.98] transition-all"
+    <button
+      onClick={onClick}
+      disabled={loading}
+      className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 active:scale-[0.98] transition-all disabled:opacity-60"
     >
-      {icon} {label}
-    </a>
+      {loading ? (
+        <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin inline-block" />
+      ) : icon}
+      {label}
+    </button>
   )
 }
 
@@ -98,6 +120,8 @@ export default function DocumentPage() {
   const [docLoading, setDocLoading] = useState(true)
   const [contentLoading, setContentLoading] = useState(false)
   const [error, setError] = useState('')
+  const [downloading, setDownloading] = useState<string | null>(null)
+  const [downloadError, setDownloadError] = useState('')
 
   useEffect(() => {
     if (!isAuthenticated()) { router.push('/login'); return }
@@ -143,13 +167,21 @@ export default function DocumentPage() {
     )
   }
 
-  const baseUrl = 'http://localhost:3001/api'
-  const originalDownloadUrl = `${baseUrl}/documents/${doc._id}/download?type=original`
-  const translationDownloadUrl = `${baseUrl}/documents/${doc._id}/download`
-  const certDownloadUrl = `${baseUrl}/documents/${doc._id}/download?type=certificate`
-
+  const baseUrl = API_BASE_URL
   const hasTranslation = !!doc.translatedFile && ['translated', 'notarizing', 'notarized', 'done'].includes(doc.status)
   const hasCert = doc.status === 'notarized' || doc.status === 'done'
+
+  async function handleDownload(key: string, url: string, filename: string) {
+    setDownloading(key)
+    setDownloadError('')
+    try {
+      await downloadWithAuth(url, filename)
+    } catch (e) {
+      setDownloadError(`Download failed: ${(e as Error).message}`)
+    } finally {
+      setDownloading(null)
+    }
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-950 transition-colors">
@@ -162,7 +194,7 @@ export default function DocumentPage() {
           </Link>
           <span>/</span>
           <span className="text-gray-900 dark:text-gray-100 font-medium truncate max-w-xs">
-            {doc.originalFile.split('/').pop()}
+            {doc.originalFileName || doc.originalFile.split('/').pop()}
           </span>
         </div>
 
@@ -170,7 +202,7 @@ export default function DocumentPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-              {doc.originalFile.split('/').pop()}
+              {doc.originalFileName || doc.originalFile.split('/').pop()}
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               {doc.fromLang} → {doc.toLang} ·{' '}
@@ -184,20 +216,33 @@ export default function DocumentPage() {
 
         {/* Download buttons */}
         <div className="flex flex-wrap gap-3 mb-8 p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
-          <DownloadButton href={originalDownloadUrl} label="Download Original" icon="⬇" />
           <DownloadButton
-            href={translationDownloadUrl}
+            onClick={() => handleDownload('original', `${baseUrl}/documents/${doc._id}/download?type=original`, doc.originalFileName || doc.originalFile.split('/').pop() || `original-${doc._id}`)}
+            label="Download Original"
+            icon="⬇"
+            loading={downloading === 'original'}
+          />
+          <DownloadButton
+            onClick={() => handleDownload('translation', `${baseUrl}/documents/${doc._id}/download`, `translation-${doc._id}${doc.translatedFile ? '.' + doc.translatedFile.split('.').pop() : ''}`)}
             label="Download Translation"
             icon="📄"
             disabled={!hasTranslation}
+            loading={downloading === 'translation'}
           />
           <DownloadButton
-            href={certDownloadUrl}
+            onClick={() => handleDownload('certificate', `${baseUrl}/documents/${doc._id}/certificate`, `certificate-${doc._id}.pdf`)}
             label="Download Certificate"
             icon="🏛"
             disabled={!hasCert}
+            loading={downloading === 'certificate'}
           />
         </div>
+
+        {downloadError && (
+          <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg px-4 py-2 mb-4">
+            {downloadError}
+          </p>
+        )}
 
         {/* Side-by-side content */}
         <div className="flex flex-col lg:flex-row gap-5">

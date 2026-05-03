@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const documentSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   originalFile: { type: String, required: true },
+  originalFileName: { type: String, default: null },
   translatedFile: { type: String, default: null },
   status: {
     type: String,

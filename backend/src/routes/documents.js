@@ -11,6 +11,14 @@ const { generateCertificate } = require('../services/certificate');
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
+const ALLOWED_EXTENSIONS = new Set(['.pdf', '.docx', '.txt', '.odt']);
+const ALLOWED_MIMETYPES = new Set([
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'text/plain',
+  'application/vnd.oasis.opendocument.text',
+]);
+
 router.use(authMiddleware);
 
 // POST /api/documents/upload
@@ -24,18 +32,21 @@ router.post('/upload', upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'fromLang and toLang are required' });
     }
 
-    const ext = path.extname(req.file.originalname);
+    const ext = path.extname(req.file.originalname).toLowerCase();
+    if (!ALLOWED_EXTENSIONS.has(ext) && !ALLOWED_MIMETYPES.has(req.file.mimetype)) {
+      return res.status(400).json({ error: 'Invalid file type. Allowed: PDF, DOCX, TXT, ODT' });
+    }
+
     const objectName = `originals/${uuidv4()}${ext}`;
 
     await minioClient.putObject(BUCKET, objectName, req.file.buffer, req.file.size, {
       'Content-Type': req.file.mimetype,
     });
 
-    const originalFile = `${objectName}`;
-
     const doc = await Document.create({
       userId: req.user.id,
-      originalFile,
+      originalFile: objectName,
+      originalFileName: req.file.originalname,
       fromLang,
       toLang,
     });
@@ -69,24 +80,37 @@ router.get('/:id/status', async (req, res) => {
   }
 });
 
-// GET /api/documents/:id/download
+// GET /api/documents/:id/download?type=original|translated
 router.get('/:id/download', async (req, res) => {
   try {
     const doc = await Document.findOne({ _id: req.params.id, userId: req.user.id });
     if (!doc) {
       return res.status(404).json({ error: 'Document not found' });
     }
+
+    const type = req.query.type === 'original' ? 'original' : 'translated';
+
+    if (type === 'original') {
+      if (!doc.originalFile) {
+        return res.status(400).json({ error: 'Original file not found' });
+      }
+      const filename = doc.originalFileName || doc.originalFile.split('/').pop();
+      const stat = await minioClient.statObject(BUCKET, doc.originalFile);
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Type', stat.metaData?.['content-type'] || 'application/octet-stream');
+      res.setHeader('Content-Length', stat.size);
+      const stream = await minioClient.getObject(BUCKET, doc.originalFile);
+      return stream.pipe(res);
+    }
+
     if (!doc.translatedFile) {
       return res.status(400).json({ error: 'Translated file not ready' });
     }
-
     const filename = doc.translatedFile.split('/').pop();
     const stat = await minioClient.statObject(BUCKET, doc.translatedFile);
-
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Type', stat.metaData?.['content-type'] || 'application/octet-stream');
     res.setHeader('Content-Length', stat.size);
-
     const stream = await minioClient.getObject(BUCKET, doc.translatedFile);
     stream.pipe(res);
   } catch (err) {
@@ -140,9 +164,7 @@ router.get('/:id/certificate', async (req, res) => {
     const notary = await User.findOne({ role: 'notary' }, 'email');
     const notaryEmail = notary?.email || 'notary@service.local';
 
-    const verifyBaseUrl = process.env.FRONTEND_URL
-      ? process.env.FRONTEND_URL.replace(':3000', ':3001')
-      : 'http://localhost:3001';
+    const verifyBaseUrl = process.env.NEXT_PUBLIC_API_URL || process.env.BACKEND_URL || 'http://localhost:3001';
 
     const pdfBuffer = await generateCertificate({
       documentId: doc._id.toString(),
@@ -157,6 +179,31 @@ router.get('/:id/certificate', async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="certificate-${doc._id}.pdf"`);
     res.setHeader('Content-Length', pdfBuffer.length);
     res.send(pdfBuffer);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/documents/:id
+router.delete('/:id', async (req, res) => {
+  try {
+    const doc = await Document.findOne({ _id: req.params.id, userId: req.user.id });
+    if (!doc) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    const removeFromMinio = async (objectName) => {
+      if (!objectName) return;
+      try { await minioClient.removeObject(BUCKET, objectName); } catch {}
+    };
+
+    await Promise.all([
+      removeFromMinio(doc.originalFile),
+      removeFromMinio(doc.translatedFile),
+    ]);
+
+    await doc.deleteOne();
+    res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

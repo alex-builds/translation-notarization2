@@ -19,6 +19,12 @@ const LANGUAGES = [
   { code: 'ja', label: 'Japanese' },
 ]
 
+const ALLOWED_EXTENSIONS = new Set(['.pdf', '.docx', '.txt', '.odt'])
+
+function getExtension(filename: string) {
+  return filename.slice(filename.lastIndexOf('.')).toLowerCase()
+}
+
 export default function UploadPage() {
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -33,21 +39,45 @@ export default function UploadPage() {
     if (!isAuthenticated()) router.push('/login')
   }, [router])
 
+  function validateFile(f: File): string {
+    const ext = getExtension(f.name)
+    if (!ALLOWED_EXTENSIONS.has(ext)) {
+      return `Unsupported file type "${ext}". Please upload PDF, DOCX, TXT, or ODT.`
+    }
+    return ''
+  }
+
   function handleDrop(e: DragEvent<HTMLDivElement>) {
     e.preventDefault()
     setDragging(false)
     const dropped = e.dataTransfer.files[0]
-    if (dropped) setFile(dropped)
+    if (!dropped) return
+    const err = validateFile(dropped)
+    if (err) { setError(err); return }
+    setError('')
+    setFile(dropped)
   }
 
   function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
-    if (e.target.files?.[0]) setFile(e.target.files[0])
+    const picked = e.target.files?.[0]
+    if (!picked) return
+    const err = validateFile(picked)
+    if (err) { setError(err); e.target.value = ''; return }
+    setError('')
+    setFile(picked)
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!file) return
     setError('')
+    if (!file) {
+      setError('Please select a file before uploading.')
+      return
+    }
+    if (sourceLang === targetLang) {
+      setError('Source and target languages must be different.')
+      return
+    }
     setUploading(true)
     try {
       const formData = new FormData()
@@ -60,7 +90,8 @@ export default function UploadPage() {
       router.push('/dashboard')
     } catch (err: unknown) {
       const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        (err as { response?: { data?: { message?: string; error?: string } } })?.response?.data?.message ||
+        (err as { response?: { data?: { message?: string; error?: string } } })?.response?.data?.error ||
         'Upload failed. Please try again.'
       setError(msg)
     } finally {
@@ -72,8 +103,8 @@ export default function UploadPage() {
     <div className="min-h-screen flex flex-col">
       <Header />
       <main className="max-w-lg mx-auto w-full px-4 py-10">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">Upload Document</h1>
-        <p className="text-sm text-gray-500 mb-6">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1">Upload Document</h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
           Select a file and choose the translation languages
         </p>
 
@@ -82,10 +113,10 @@ export default function UploadPage() {
           <div
             className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${
               dragging
-                ? 'border-blue-400 bg-blue-50'
+                ? 'border-blue-400 bg-blue-50 dark:bg-blue-950'
                 : file
-                ? 'border-green-400 bg-green-50'
-                : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50'
+                ? 'border-green-400 bg-green-50 dark:bg-green-950'
+                : 'border-gray-300 dark:border-gray-600 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950'
             }`}
             onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
             onDragLeave={() => setDragging(false)}
@@ -102,18 +133,18 @@ export default function UploadPage() {
             />
             {file ? (
               <div>
-                <p className="text-green-700 font-medium">{file.name}</p>
-                <p className="text-xs text-green-600 mt-1">
+                <p className="text-green-700 dark:text-green-400 font-medium">{file.name}</p>
+                <p className="text-xs text-green-600 dark:text-green-500 mt-1">
                   {(file.size / 1024).toFixed(1)} KB — click to change
                 </p>
               </div>
             ) : (
               <div>
                 <p className="text-3xl mb-2">📎</p>
-                <p className="text-gray-600 font-medium">
+                <p className="text-gray-600 dark:text-gray-300 font-medium">
                   Drag & drop your file here
                 </p>
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                   or click to browse — PDF, DOCX, TXT, ODT
                 </p>
               </div>
@@ -123,14 +154,14 @@ export default function UploadPage() {
           {/* Language selectors */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Source Language
               </label>
               <select
                 value={sourceLang}
                 onChange={(e) => setSourceLang(e.target.value)}
                 data-testid="source-lang"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {LANGUAGES.map((l) => (
                   <option key={l.code} value={l.code}>{l.label}</option>
@@ -138,14 +169,14 @@ export default function UploadPage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Target Language
               </label>
               <select
                 value={targetLang}
                 onChange={(e) => setTargetLang(e.target.value)}
                 data-testid="target-lang"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {LANGUAGES.map((l) => (
                   <option key={l.code} value={l.code}>{l.label}</option>
@@ -162,7 +193,7 @@ export default function UploadPage() {
 
           <button
             type="submit"
-            disabled={!file || uploading}
+            disabled={uploading}
             data-testid="upload-submit"
             className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50"
           >

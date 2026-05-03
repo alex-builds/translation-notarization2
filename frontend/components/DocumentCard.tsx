@@ -5,10 +5,11 @@ import StatusBadge, { DocumentStatus } from './StatusBadge'
 
 export interface Document {
   _id: string
-  filename: string
+  originalFileName: string | null
+  originalFile: string
   status: DocumentStatus
-  sourceLang: string
-  targetLang: string
+  fromLang: string
+  toLang: string
   createdAt: string
 }
 
@@ -86,11 +87,17 @@ export default function DocumentCard({
   doc,
   onPay,
   paying,
+  onDelete,
+  deleting,
 }: {
   doc: Document
   onPay?: () => void
   paying?: boolean
+  onDelete?: () => void
+  deleting?: boolean
 }) {
+  const displayName = doc.originalFileName || doc.originalFile?.split('/').pop() || doc._id.slice(-8)
+
   return (
     <div data-testid="document-card" className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4 shadow-sm hover:shadow-md dark:hover:shadow-gray-800 transition-all duration-200 group">
       <div className="flex items-start justify-between gap-2">
@@ -99,13 +106,34 @@ export default function DocumentCard({
             href={`/document/${doc._id}`}
             className="font-medium text-gray-900 dark:text-gray-100 truncate block hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
           >
-            {doc.filename || doc._id.slice(-8)}
+            {displayName}
           </Link>
           <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-            {doc.sourceLang} → {doc.targetLang}
+            {doc.fromLang} → {doc.toLang}
           </p>
         </div>
-        <StatusBadge status={doc.status} />
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <StatusBadge status={doc.status} />
+          {onDelete && (
+            <button
+              onClick={(e) => { e.preventDefault(); onDelete() }}
+              disabled={deleting}
+              title="Delete document"
+              className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors disabled:opacity-40 p-0.5"
+            >
+              {deleting ? (
+                <span className="w-4 h-4 rounded-full border-2 border-red-400 border-t-transparent animate-spin inline-block" />
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6"/>
+                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                  <path d="M10 11v6M14 11v6"/>
+                  <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                </svg>
+              )}
+            </button>
+          )}
+        </div>
       </div>
 
       <StepProgressBar status={doc.status} />

@@ -60,6 +60,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [payingId, setPayingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -106,6 +107,19 @@ export default function DashboardPage() {
 
     return () => clearInterval(interval)
   }, [docs])
+
+  async function handleDelete(docId: string) {
+    if (!confirm('Delete this document? This cannot be undone.')) return
+    setDeletingId(docId)
+    try {
+      await api.delete(`/documents/${docId}`)
+      setDocs((prev) => prev.filter((d) => d._id !== docId))
+    } catch {
+      setError('Failed to delete document.')
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   async function handlePay(docId: string) {
     setPayingId(docId)
@@ -179,6 +193,8 @@ export default function DashboardPage() {
                 doc={doc}
                 onPay={() => handlePay(doc._id)}
                 paying={payingId === doc._id}
+                onDelete={() => handleDelete(doc._id)}
+                deleting={deletingId === doc._id}
               />
             ))}
           </div>
