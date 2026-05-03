@@ -18,7 +18,7 @@ const loginLimiter = rateLimit({
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
   try {
-    const { email, password, role } = req.body;
+    const { email, password } = req.body;
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
     }
@@ -32,7 +32,7 @@ router.post('/register', async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
-    const user = await User.create({ email, passwordHash, role });
+    const user = await User.create({ email, passwordHash, role: 'user' });
 
     const token = jwt.sign(
       { id: user._id, email: user.email, role: user.role },

@@ -26,9 +26,8 @@ export default function LoginPage() {
       saveToken(data.token)
       router.push('/dashboard')
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        'Invalid email or password'
+      const d = (err as { response?: { data?: { message?: string; error?: string } } })?.response?.data
+      const msg = d?.message || d?.error || 'Invalid email or password'
       setError(msg)
     } finally {
       setLoading(false)
