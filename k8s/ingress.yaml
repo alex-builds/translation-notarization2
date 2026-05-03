@@ -9,7 +9,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - host: translation-notarization.local
+    - host: translate.shopappmarket.org
       http:
         paths:
           - path: /api(/|$)(.*)
