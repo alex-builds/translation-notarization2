@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { getToken } from './auth'
 
-export const API_BASE_URL = 'http://localhost:3001/api'
+export const API_BASE_URL = '/api'
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -23,7 +23,6 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       const url: string = error.config?.url || ''
-      // Don't redirect on auth endpoints — let the page handle the error itself
       if (typeof window !== 'undefined' && !url.includes('/auth/')) {
         localStorage.removeItem('auth_token')
         window.location.href = '/login'

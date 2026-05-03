@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Header from '@/components/Header'
 import DocumentCard, { Document } from '@/components/DocumentCard'
+import Toast, { ToastMessage } from '@/components/Toast'
 import { isAuthenticated } from '@/lib/auth'
 import api from '@/lib/api'
 
@@ -54,6 +55,62 @@ function QueueWidget() {
   )
 }
 
+function SkeletonCard() {
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4 shadow-sm animate-pulse">
+      <div className="flex items-start justify-between gap-2 mb-4">
+        <div className="flex-1">
+          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-2" />
+          <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded w-1/3" />
+        </div>
+        <div className="h-5 w-16 bg-gray-200 dark:bg-gray-700 rounded-full" />
+      </div>
+      <div className="flex items-center gap-1 mt-4">
+        {[...Array(6)].map((_, i) => (
+          <div key={i} className="flex items-center flex-1 last:flex-none">
+            <div className="w-3 h-3 rounded-full bg-gray-200 dark:bg-gray-700" />
+            {i < 5 && <div className="flex-1 h-0.5 mx-1 bg-gray-100 dark:bg-gray-800" />}
+          </div>
+        ))}
+      </div>
+      <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded w-1/4 mt-4" />
+    </div>
+  )
+}
+
+function ConfirmDialog({
+  onConfirm,
+  onCancel,
+}: {
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-xl p-6 w-full max-w-sm">
+        <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-1">Delete document?</h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
+          This will permanently delete the document and all associated files. This cannot be undone.
+        </p>
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg py-2 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 bg-red-600 text-white rounded-lg py-2 text-sm font-medium hover:bg-red-700 transition-colors"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function DashboardPage() {
   const router = useRouter()
   const [docs, setDocs] = useState<Document[]>([])
@@ -61,6 +118,17 @@ export default function DashboardPage() {
   const [error, setError] = useState('')
   const [payingId, setPayingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [toasts, setToasts] = useState<ToastMessage[]>([])
+
+  const addToast = useCallback((type: ToastMessage['type'], text: string) => {
+    const id = Date.now()
+    setToasts((prev) => [...prev, { id, type, text }])
+  }, [])
+
+  const dismissToast = useCallback((id: number) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id))
+  }, [])
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -108,14 +176,21 @@ export default function DashboardPage() {
     return () => clearInterval(interval)
   }, [docs])
 
-  async function handleDelete(docId: string) {
-    if (!confirm('Delete this document? This cannot be undone.')) return
+  function requestDelete(docId: string) {
+    setConfirmDeleteId(docId)
+  }
+
+  async function confirmDelete() {
+    if (!confirmDeleteId) return
+    const docId = confirmDeleteId
+    setConfirmDeleteId(null)
     setDeletingId(docId)
     try {
       await api.delete(`/documents/${docId}`)
       setDocs((prev) => prev.filter((d) => d._id !== docId))
+      addToast('success', 'Document deleted successfully')
     } catch {
-      setError('Failed to delete document.')
+      addToast('error', 'Failed to delete document. Please try again.')
     } finally {
       setDeletingId(null)
     }
@@ -130,7 +205,7 @@ export default function DashboardPage() {
       })
       window.location.href = data.url
     } catch {
-      setError('Failed to start payment. Please try again.')
+      addToast('error', 'Failed to start payment. Please try again.')
       setPayingId(null)
     }
   }
@@ -158,11 +233,8 @@ export default function DashboardPage() {
         </div>
 
         {loading && (
-          <div className="flex justify-center py-20 text-gray-400 dark:text-gray-600">
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
-              Loading…
-            </div>
+          <div data-testid="skeleton-grid" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[...Array(3)].map((_, i) => <SkeletonCard key={i} />)}
           </div>
         )}
 
@@ -193,13 +265,22 @@ export default function DashboardPage() {
                 doc={doc}
                 onPay={() => handlePay(doc._id)}
                 paying={payingId === doc._id}
-                onDelete={() => handleDelete(doc._id)}
+                onDelete={() => requestDelete(doc._id)}
                 deleting={deletingId === doc._id}
               />
             ))}
           </div>
         )}
       </main>
+
+      {confirmDeleteId && (
+        <ConfirmDialog
+          onConfirm={confirmDelete}
+          onCancel={() => setConfirmDeleteId(null)}
+        />
+      )}
+
+      <Toast toasts={toasts} onDismiss={dismissToast} />
     </div>
   )
 }

@@ -36,8 +36,8 @@ function StepProgressBar({ status }: { status: DocumentStatus }) {
   const current = STATUS_STEP[status] ?? 0
 
   return (
-    <div className="mt-4">
-      <div className="flex items-center">
+    <div className="mt-4 overflow-x-auto">
+      <div className="flex items-center min-w-[320px]">
         {STEPS.map((step, i) => {
           const done = i < current
           const active = i === current
@@ -45,7 +45,6 @@ function StepProgressBar({ status }: { status: DocumentStatus }) {
 
           return (
             <div key={step.key} className="flex items-center flex-1 last:flex-none">
-              {/* dot */}
               <div className="flex flex-col items-center">
                 <div
                   className={[
@@ -66,7 +65,6 @@ function StepProgressBar({ status }: { status: DocumentStatus }) {
                   {step.label}
                 </span>
               </div>
-              {/* connector */}
               {!last && (
                 <div className="flex-1 h-0.5 mb-4 mx-1 transition-all duration-500">
                   <div className={[
@@ -104,6 +102,7 @@ export default function DocumentCard({
         <div className="min-w-0">
           <Link
             href={`/document/${doc._id}`}
+            prefetch={false}
             className="font-medium text-gray-900 dark:text-gray-100 truncate block hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
           >
             {displayName}
@@ -157,6 +156,7 @@ export default function DocumentCard({
       {(doc.status === 'translated' || doc.status === 'notarized' || doc.status === 'done') && (
         <Link
           href={`/document/${doc._id}`}
+          prefetch={false}
           className="mt-3 w-full flex items-center justify-center gap-1.5 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-sm font-semibold py-2 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors"
         >
           View & Download →

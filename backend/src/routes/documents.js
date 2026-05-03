@@ -9,7 +9,7 @@ const { authMiddleware } = require('../middleware/auth');
 const { generateCertificate } = require('../services/certificate');
 
 const router = express.Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 const ALLOWED_EXTENSIONS = new Set(['.pdf', '.docx', '.txt', '.odt']);
 const ALLOWED_MIMETYPES = new Set([
@@ -22,7 +22,15 @@ const ALLOWED_MIMETYPES = new Set([
 router.use(authMiddleware);
 
 // POST /api/documents/upload
-router.post('/upload', upload.single('file'), async (req, res) => {
+router.post('/upload', (req, res, next) => {
+  upload.single('file')(req, res, (err) => {
+    if (err && err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ error: 'File too large. Maximum size is 10MB.' });
+    }
+    if (err) return res.status(400).json({ error: err.message });
+    next();
+  });
+}, async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'File is required' });
@@ -33,7 +41,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     }
 
     const ext = path.extname(req.file.originalname).toLowerCase();
-    if (!ALLOWED_EXTENSIONS.has(ext) && !ALLOWED_MIMETYPES.has(req.file.mimetype)) {
+    if (!ALLOWED_EXTENSIONS.has(ext) || !ALLOWED_MIMETYPES.has(req.file.mimetype)) {
       return res.status(400).json({ error: 'Invalid file type. Allowed: PDF, DOCX, TXT, ODT' });
     }
 

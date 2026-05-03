@@ -6,7 +6,7 @@ import Link from 'next/link'
 import Header from '@/components/Header'
 import StatusBadge, { DocumentStatus } from '@/components/StatusBadge'
 import { isAuthenticated, getToken } from '@/lib/auth'
-import api, { API_BASE_URL } from '@/lib/api'
+import api from '@/lib/api'
 
 interface DocDetail {
   _id: string
@@ -167,7 +167,6 @@ export default function DocumentPage() {
     )
   }
 
-  const baseUrl = API_BASE_URL
   const hasTranslation = !!doc.translatedFile && ['translated', 'notarizing', 'notarized', 'done'].includes(doc.status)
   const hasCert = doc.status === 'notarized' || doc.status === 'done'
 
@@ -217,20 +216,20 @@ export default function DocumentPage() {
         {/* Download buttons */}
         <div className="flex flex-wrap gap-3 mb-8 p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
           <DownloadButton
-            onClick={() => handleDownload('original', `${baseUrl}/documents/${doc._id}/download?type=original`, doc.originalFileName || doc.originalFile.split('/').pop() || `original-${doc._id}`)}
+            onClick={() => handleDownload('original', `/api/documents/${doc._id}/download?type=original`, doc.originalFileName || doc.originalFile.split('/').pop() || `original-${doc._id}`)}
             label="Download Original"
             icon="⬇"
             loading={downloading === 'original'}
           />
           <DownloadButton
-            onClick={() => handleDownload('translation', `${baseUrl}/documents/${doc._id}/download`, `translation-${doc._id}${doc.translatedFile ? '.' + doc.translatedFile.split('.').pop() : ''}`)}
+            onClick={() => handleDownload('translation', `/api/documents/${doc._id}/download`, `translation-${doc._id}${doc.translatedFile ? '.' + doc.translatedFile.split('.').pop() : ''}`)}
             label="Download Translation"
             icon="📄"
             disabled={!hasTranslation}
             loading={downloading === 'translation'}
           />
           <DownloadButton
-            onClick={() => handleDownload('certificate', `${baseUrl}/documents/${doc._id}/certificate`, `certificate-${doc._id}.pdf`)}
+            onClick={() => handleDownload('certificate', `/api/documents/${doc._id}/certificate`, `certificate-${doc._id}.pdf`)}
             label="Download Certificate"
             icon="🏛"
             disabled={!hasCert}
