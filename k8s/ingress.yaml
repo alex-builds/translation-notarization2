@@ -4,11 +4,10 @@ metadata:
   name: app-ingress
   namespace: translation-notarization
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /$2
-    nginx.ingress.kubernetes.io/proxy-body-size: "20m"
+    kubernetes.io/ingress.class: traefik
     cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
-  ingressClassName: nginx
+  ingressClassName: traefik
   tls:
     - hosts:
         - translate.shopappmarket.org
@@ -17,22 +16,22 @@ spec:
     - host: translate.shopappmarket.org
       http:
         paths:
-          - path: /api(/|$)(.*)
-            pathType: ImplementationSpecific
+          - path: /api
+            pathType: Prefix
             backend:
               service:
                 name: backend
                 port:
                   number: 3001
-          - path: /notary-api(/|$)(.*)
-            pathType: ImplementationSpecific
+          - path: /notary-api
+            pathType: Prefix
             backend:
               service:
                 name: notarization
                 port:
                   number: 3002
-          - path: /()(.*)
-            pathType: ImplementationSpecific
+          - path: /
+            pathType: Prefix
             backend:
               service:
                 name: frontend
