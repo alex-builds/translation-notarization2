@@ -13,7 +13,7 @@ router.use(requireRole('notary'));
 router.get('/documents', async (req, res) => {
   try {
     const docs = await Document.find({
-      status: { $in: ['translated', 'notarizing'] },
+      status: { $in: ['translated', 'notarizing', 'notarized'] },
     })
       .populate('userId', 'email')
       .sort({ createdAt: -1 });

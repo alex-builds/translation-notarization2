@@ -3,23 +3,18 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Header from '@/components/Header'
-import { isAuthenticated, getRole, getToken } from '@/lib/auth'
-import axios from 'axios'
-
-const NOTARY_API = 'http://localhost:3002/api/notary'
+import { isAuthenticated, getRole } from '@/lib/auth'
+import api from '@/lib/api'
 
 interface NotaryDocument {
   _id: string
   originalFile: string
+  originalFileName: string | null
   fromLang: string
   toLang: string
   status: string
   createdAt: string
   userId?: { email: string }
-}
-
-function authHeaders() {
-  return { Authorization: `Bearer ${getToken()}` }
 }
 
 export default function NotaryPage() {
@@ -39,10 +34,9 @@ export default function NotaryPage() {
 
   async function fetchDocs() {
     setLoading(true)
+    setError('')
     try {
-      const { data } = await axios.get<NotaryDocument[]>(`${NOTARY_API}/documents`, {
-        headers: authHeaders(),
-      })
+      const { data } = await api.get<NotaryDocument[]>('/notary/documents')
       setDocs(data)
     } catch {
       setError('Failed to load documents.')
@@ -54,7 +48,7 @@ export default function NotaryPage() {
   async function handleSign(docId: string) {
     setSigningId(docId)
     try {
-      await axios.post(`${NOTARY_API}/sign/${docId}`, {}, { headers: authHeaders() })
+      await api.post(`/notary/sign/${docId}`)
       await fetchDocs()
     } catch {
       setError('Failed to sign document.')
@@ -146,7 +140,7 @@ function NotaryRow({
     <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex items-center justify-between gap-4">
       <div className="min-w-0">
         <p className="font-medium text-gray-900 truncate">
-          {(doc.originalFile ?? doc._id).split('/').pop()}
+          {doc.originalFileName || doc.originalFile?.split('/').pop() || doc._id}
         </p>
         <p className="text-xs text-gray-400 mt-0.5">
           {doc.fromLang} → {doc.toLang}
