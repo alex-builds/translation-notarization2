@@ -64,6 +64,31 @@ app.get('/api/queue/stats', async (req, res) => {
   }
 });
 
+// POST /api/admin/requeue/:documentId — re-add paid document to translation queue
+// Protected by ADMIN_SECRET env var. Used for E2E testing / manual recovery.
+app.post('/api/admin/requeue/:documentId', async (req, res) => {
+  const secret = process.env.ADMIN_SECRET;
+  if (!secret || req.headers['x-admin-secret'] !== secret) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  try {
+    const doc = await Document.findById(req.params.documentId);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    if (doc.status !== 'paid') {
+      return res.status(400).json({ error: `Document status is "${doc.status}", expected "paid"` });
+    }
+    await translationQueue.add('translate', {
+      documentId: doc._id.toString(),
+      originalFileUrl: doc.originalFile,
+      fromLang: doc.fromLang,
+      toLang: doc.toLang,
+    });
+    res.json({ ok: true, message: 'Job re-queued', documentId: doc._id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/verify/:documentId — public endpoint for QR code verification
 app.get('/api/verify/:documentId', async (req, res) => {
   try {
