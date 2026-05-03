@@ -103,7 +103,7 @@ export default function UploadPage() {
     <div className="min-h-screen flex flex-col">
       <Header />
       <main className="max-w-lg mx-auto w-full px-4 py-10">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1">Upload Document</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">Upload Document</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
           Select a file and choose the translation languages
         </p>
@@ -154,7 +154,7 @@ export default function UploadPage() {
           {/* Language selectors */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                 Source Language
               </label>
               <select
@@ -169,7 +169,7 @@ export default function UploadPage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                 Target Language
               </label>
               <select

@@ -37,7 +37,7 @@ function StepProgressBar({ status }: { status: DocumentStatus }) {
 
   return (
     <div className="mt-4 overflow-x-auto">
-      <div className="flex items-center min-w-[320px]">
+      <div className="flex items-center min-w-max">
         {STEPS.map((step, i) => {
           const done = i < current
           const active = i === current
