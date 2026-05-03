@@ -35,11 +35,6 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data/db
-          readinessProbe:
-            exec:
-              command: ["mongosh", "--eval", "db.adminCommand('ping')"]
-            initialDelaySeconds: 10
-            periodSeconds: 10
   volumeClaimTemplates:
     - metadata:
         name: data
